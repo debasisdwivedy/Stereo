@@ -44,8 +44,8 @@ class Message_Matirx {
     }
     void set_message(char from_dir, int d, int i, int j, double value) {
         if (from_dir=='l')
-            M_from_right[d](j,i) = value;
-        else M_from_left[d](j,i) = value;
+            M_from_left[d](j,i) = value;
+        else M_from_right[d](j,i) = value;
     }
     void normalize() {
 		for(vector<CImg<double>>::iterator it = M_from_left.begin(); it != M_from_left.end(); ++it){
@@ -54,6 +54,24 @@ class Message_Matirx {
 		for(vector<CImg<double>>::iterator it = M_from_right.begin(); it != M_from_right.end(); ++it){
 			(*it).normalize(0,DBL_MAX/2);
 		}
+	}
+	//for debugging purposes
+	double min_left() {
+		long double ml=INFINITY;
+		for(vector<CImg<double>>::iterator it = M_from_left.begin(); it != M_from_left.end(); ++it){
+			if (ml<(*it).min()) ml = (*it).min();
+			(*it).min();
+		}
+		//ml /= M_from_left.size();
+		return ml;
+	}
+	double min_right() {
+		long double ml=INFINITY;
+		for(vector<CImg<double>>::iterator it = M_from_right.begin(); it != M_from_right.end(); ++it){
+			if (ml<(*it).min()) ml = (*it).min();
+		}
+		//ml /= M_from_right.size();
+		return ml;
 	}
 };
 vector<Message_Matirx> Messages;
@@ -94,6 +112,7 @@ double D_function(const CImg<double> &input1, const CImg<double> &input2, int i,
     for(int ii = max(i-window_size, 0); ii <= min(i+window_size, input1.height()-1); ii++)
         for(int jj = max(j-window_size, 0); jj <= min(j+window_size, input1.width()-1); jj++)
             cost += sqr(input1(min(jj+d, input1.width()-1), ii) - input2(jj, ii));
+    if(cost==INFINITY) cout<<"\nD_function_value is infinity..!"<<endl;
     return cost;
 }
 
@@ -120,47 +139,51 @@ double Compute_Message (char dir, const CImg<double> &input1, const CImg<double>
         cout<<"iteration :"<<count<<" dir : "<<dir<<"iteration number: "<<t<<endl;;
     
     vector<int> d2 = get_d2(d1, max_desp);
-    double cost = 0;
+    long double cost = 0;
     int d;
-    pair<int, double> best_disp(0, INFINITY);
-    if ( (t==0) || ((dir=='r')&&((j-1)<0)) || ((dir=='l')&&((j+1)>input1.width())) ) {
+    pair<int, long double> best_disp(0, INFINITY);
+    if ( (t==0) || ((dir=='r')&&((j-1)<0)) || ((dir=='l')&&((j+1)>=input1.width())) ) {
         //cout<<"base case"<<endl;
         for(vector<int>::iterator it = d2.begin(); it != d2.end(); ++it) {
-            cost= ( D_function(input1, input2, i,j,*it, ws) + V_function(d1,*it) );//v function constant =30
+            cost = ( D_function(input1, input2, i,j,*it, ws) + V_function(d1,*it) );//v function constant =30
             d = *it;
             if(cost < best_disp.second)
 				best_disp = make_pair(d, cost);
         }
-        return best_disp.second;
+        if(cost==INFINITY) cout<<"\nMessage value is infinity..!"<<endl;
+        return (best_disp.second<(DBL_MAX-2))?best_disp.second:(DBL_MAX-2);
     }
     else if (dir == 'r') {
 		char from_dir = 'l';//requires previous iteration message from left of i,j
         //cout<<"sending message to right of i,j"<<endl;
         for(vector<int>::iterator it = d2.begin(); it != d2.end(); ++it) {
-            double cost = 0;
+            //double cost = 0;
             cost = ( D_function(input1, input2, i,j,*it, ws) + V_function(d1,*it) + Messages[t-1].get_message(from_dir, *it, i, j) );
             d = *it;
             if(cost < best_disp.second)
             best_disp = make_pair(d, cost);
         }
-        return best_disp.second;
+        if(cost==INFINITY) cout<<"\nMessage value is infinity..!"<<endl;
+        return (best_disp.second<(DBL_MAX-2))?best_disp.second:(DBL_MAX-2);
     }
     else if (dir == 'l') {
         //cout<<"sending message to left of i,j"<<endl;
         char from_dir = 'r';//requires previous iteration message from right of i,j
         for(vector<int>::iterator it = d2.begin(); it != d2.end(); ++it) {
-            double cost = 0;
+            //double cost = 0;
             cost = ( D_function(input1, input2, i,j,*it, ws) + V_function(d1,*it) + Messages[t-1].get_message(from_dir, *it, i, j) );
             d = *it;
             if(cost < best_disp.second)
             best_disp = make_pair(d, cost);
         }
-        return best_disp.second;
+        if(cost==INFINITY) cout<<"\nMessage value is infinity..!"<<endl;
+        return (best_disp.second<(DBL_MAX-2))?best_disp.second:(DBL_MAX-2);
     }
 }
 
 //Scanline Stereo BP
 
+/*
 //A function to transfer Belief messages and store them
 void generate_belief (const CImg<double> &input1, const CImg<double> &input2, int window_size, int max_disp, int max_iter) {    
     for (int time=0;time<max_iter;time++) {
@@ -179,6 +202,7 @@ void generate_belief (const CImg<double> &input1, const CImg<double> &input2, in
     }
     cout<<"\nBelief Generated";
 }
+*/
 
 void calculate_energy (const CImg<double> &input1, const CImg<double> &input2, int window_size, int max_disp, int max_iter) {
     
@@ -195,6 +219,11 @@ void calculate_energy (const CImg<double> &input1, const CImg<double> &input2, i
                 }
 			}
 		}
+		cout<<"\n Min message left: "<<temp.min_left()<<endl;
+		cout<<"\n Min message right: "<<temp.min_right()<<endl;
+		temp.normalize();
+		cout<<"\n Min message left: "<<temp.min_left()<<endl;
+		cout<<"\n Min message right: "<<temp.min_right()<<endl;
         Messages.push_back(temp);
 		CImg<double> result(input1.width(), input1.height());
 		for(int i=0; i<input1.height(); i++) {
@@ -298,11 +327,11 @@ int main(int argc, char *argv[])
   CImg<double> input1 = image1.get_resize(image1.width()/SCALE, image1.height()/SCALE, 1,1);
     CImg<double> input2 = image2.get_resize(image2.width()/SCALE, image2.height()/SCALE, 1,1);
   // do naive stereo (matching only, no MRF)
-  CImg<double> naive_disp = naive_stereo(input1, input2, 5, MD2);
+  CImg<double> naive_disp = naive_stereo(input1, input2, 5, 50);
   naive_disp.get_normalize(0,255).save((input_filename1 + "-disp_naive.png").c_str());
 
   // do scan line stereo using bp
-  CImg<double> sl_disp = sl_stereo(input1, input2, 5, MD2, input1.width()+input1.height());//input1.width()+input1.height()
+  CImg<double> sl_disp = sl_stereo(input1, input2, 5, 50, 20);//input1.width()+input1.height()
   sl_disp.get_normalize(0,255).save((input_filename1 + "-disp_sl.png").c_str());
 
   // do stereo using mrf
@@ -311,7 +340,7 @@ int main(int argc, char *argv[])
   // Measure error with respect to ground truth, if we have it...
   if(gt_filename != "")
     {
-      cout << "\nNaive stereo technique mean error = " << (naive_disp-gt_sl).sqr().sum()/gt.height()/gt.width() << endl;
+      cout << "\nNaive stereo technique mean error = " << (naive_disp-gt_sl).sqr().sum()/gt_sl.height()/gt_sl.width() << endl;
       cout << "\nScan Line stereo technique mean error = " << (sl_disp-gt_sl).sqr().sum()/gt_sl.height()/gt_sl.width() << endl;
       //cout << "\nMRF stereo technique mean error = " << (mrf_disp-gt).sqr().sum()/gt.height()/gt.width() << endl;
     }
