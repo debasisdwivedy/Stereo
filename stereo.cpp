@@ -12,6 +12,7 @@
 #include <math.h>
 #include <CImg.h>
 #include <assert.h>
+#include <float.h>
 
 using namespace cimg_library;
 using namespace std;
@@ -19,7 +20,8 @@ using namespace std;
 double sqr(double a) { return a*a; }
 int count=0;
 //downsampling scale
-#define SCALE 2
+#define SCALE 4
+#define C 100
 
 //class to store messages from a certain iteration
 class Message_Matirx {
@@ -45,6 +47,14 @@ class Message_Matirx {
             M_from_right[d](j,i) = value;
         else M_from_left[d](j,i) = value;
     }
+    void normalize() {
+		for(vector<CImg<double>>::iterator it = M_from_left.begin(); it != M_from_left.end(); ++it){
+			(*it).normalize(0,DBL_MAX/2);
+		}
+		for(vector<CImg<double>>::iterator it = M_from_right.begin(); it != M_from_right.end(); ++it){
+			(*it).normalize(0,DBL_MAX/2);
+		}
+	}
 };
 vector<Message_Matirx> Messages;
 //vector<Message_Matirx> to store the messages as per the iterations
@@ -88,10 +98,10 @@ double D_function(const CImg<double> &input1, const CImg<double> &input2, int i,
 }
 
 //[Potts Model -> c is potts constant] Pairwise_cost or V_function(x,y)
-double V_function(double x, double y, double c) {
+double V_function(double x, double y) {
     if ((x-y)==0)
         return 0;
-    else return c;
+    else return C;
 }
 
 //return set of possible d2 values given d1 from a set of S [max_desp is given]
@@ -108,7 +118,7 @@ double Compute_Message (char dir, const CImg<double> &input1, const CImg<double>
     count++;
     if(count==INFINITY)
         cout<<"iteration :"<<count<<" dir : "<<dir<<"iteration number: "<<t<<endl;;
-    //int ws = 5;
+    
     vector<int> d2 = get_d2(d1, max_desp);
     double cost = 0;
     int d;
@@ -116,7 +126,7 @@ double Compute_Message (char dir, const CImg<double> &input1, const CImg<double>
     if ( (t==0) || ((dir=='r')&&((j-1)<0)) || ((dir=='l')&&((j+1)>input1.width())) ) {
         //cout<<"base case"<<endl;
         for(vector<int>::iterator it = d2.begin(); it != d2.end(); ++it) {
-            cost= ( D_function(input1, input2, i,j,*it, ws) + V_function(d1,*it,30) );//v function constant =30
+            cost= ( D_function(input1, input2, i,j,*it, ws) + V_function(d1,*it) );//v function constant =30
             d = *it;
             if(cost < best_disp.second)
 				best_disp = make_pair(d, cost);
@@ -124,24 +134,23 @@ double Compute_Message (char dir, const CImg<double> &input1, const CImg<double>
         return best_disp.second;
     }
     else if (dir == 'r') {
-		char from_dir = 'l';
-        //cout<<"sending direction right"<<endl;
+		char from_dir = 'l';//requires previous iteration message from left of i,j
+        //cout<<"sending message to right of i,j"<<endl;
         for(vector<int>::iterator it = d2.begin(); it != d2.end(); ++it) {
             double cost = 0;
-            cost = ( D_function(input1, input2, i,j,*it, ws) + V_function(d1,*it,30) + Messages[t-1].get_message(from_dir, *it, i, j) );
+            cost = ( D_function(input1, input2, i,j,*it, ws) + V_function(d1,*it) + Messages[t-1].get_message(from_dir, *it, i, j) );
             d = *it;
             if(cost < best_disp.second)
             best_disp = make_pair(d, cost);
         }
-        
         return best_disp.second;
     }
     else if (dir == 'l') {
-        //cout<<"sending direction left"<<endl;
-        char from_dir = 'r';
+        //cout<<"sending message to left of i,j"<<endl;
+        char from_dir = 'r';//requires previous iteration message from right of i,j
         for(vector<int>::iterator it = d2.begin(); it != d2.end(); ++it) {
             double cost = 0;
-            cost = ( D_function(input1, input2, i,j,*it, ws) + V_function(d1,*it,30) + Messages[t-1].get_message(from_dir, *it, i, j) );
+            cost = ( D_function(input1, input2, i,j,*it, ws) + V_function(d1,*it) + Messages[t-1].get_message(from_dir, *it, i, j) );
             d = *it;
             if(cost < best_disp.second)
             best_disp = make_pair(d, cost);
@@ -153,9 +162,7 @@ double Compute_Message (char dir, const CImg<double> &input1, const CImg<double>
 //Scanline Stereo BP
 
 //A function to transfer Belief messages and store them
-void generate_belief (const CImg<double> &input1, const CImg<double> &input2, int window_size, int max_disp, int max_iter) {
-    //CImg<double> result(input1.width(), input1.height());
-    
+void generate_belief (const CImg<double> &input1, const CImg<double> &input2, int window_size, int max_disp, int max_iter) {    
     for (int time=0;time<max_iter;time++) {
 		cout<<"\nIteration number: "<<time;
         Message_Matirx temp(max_disp, input1.width(), input1.height());
@@ -167,25 +174,27 @@ void generate_belief (const CImg<double> &input1, const CImg<double> &input2, in
                     if ((j+1)<input1.width())
                     temp.set_message('l', d, i, j+1, Compute_Message('r', input1, input2, time, i, j, d, max_disp, window_size) );
                 }
+        temp.normalize();        
         Messages.push_back(temp);
     }
     cout<<"\nBelief Generated";
 }
 
 void calculate_energy (const CImg<double> &input1, const CImg<double> &input2, int window_size, int max_disp, int max_iter) {
-    CImg<double> result(input1.width(), input1.height());
     
-    for (int time=0;time<max_iter;time++) {
+    for (int time=0;time<=max_iter;time++) {
 		cout<<"\nIteration number: "<<time;
         Message_Matirx temp(max_disp, input1.width(), input1.height());
-        for(int i=0; i<input1.height(); i++)
-            for(int j=0; j<input1.width(); j++)
+        for(int i=0; i<input1.height(); i++){
+            for(int j=0; j<input1.width(); j++) {
                 for (int d=0; d < max_disp; d++) {
 					if ((j-1)>0)
                     temp.set_message('r', d, i, j-1, Compute_Message('l', input1, input2, time, i, j, d, max_disp, window_size) );
                     if ((j+1)<input1.width())
                     temp.set_message('l', d, i, j+1, Compute_Message('r', input1, input2, time, i, j, d, max_disp, window_size) );
                 }
+			}
+		}
         Messages.push_back(temp);
 		CImg<double> result(input1.width(), input1.height());
 		for(int i=0; i<input1.height(); i++) {
@@ -202,7 +211,7 @@ void calculate_energy (const CImg<double> &input1, const CImg<double> &input2, i
 		long double Energy=0;
 		for(int i=0; i<input1.height(); i++) {
 			for(int j=0; j<input1.width(); j++) {
-				Energy+= D_function(input1,input2, i, j, result(j,i), window_size)+(((j-1)>0)?V_function(result(j,i),result(j-1,i), 30):0)+(((j+1)<input1.width())?V_function(result(j,i),result(j+1,i), 30):0);
+				Energy += D_function(input1,input2, i, j, result(j,i), window_size)+(((j-1)>0)?V_function(result(j,i),result(j-1,i)):0)+(((j+1)<input1.width())?V_function(result(j,i),result(j+1,i)):0);
 			}
 		}
 		cout<<"\nEnergy of the iteration "<<time<<" : "<<Energy<<" \n";
@@ -222,7 +231,7 @@ CImg<double> sl_stereo(const CImg<double> &input1, const CImg<double> &input2, i
         for(int j=0; j<input1.width(); j++) {
             pair<int, double> best_disp(0, INFINITY);
             for (int d=0; d < max_disp; d++) {
-                double cost =( D_function(input1,input2, i, j, d, window_size) + Messages[max_iter-1].get_message('l', d, i, j) + Messages[max_iter-1].get_message('r', d, i, j) );
+                double cost =( D_function(input1,input2, i, j, d, window_size) + Messages[max_iter].get_message('l', d, i, j) + Messages[max_iter].get_message('r', d, i, j) );
 				if(cost < best_disp.second)
 					best_disp = make_pair(d, cost);
 				}
@@ -267,7 +276,7 @@ int main(int argc, char *argv[])
   CImg<double> image1(input_filename1.c_str());
   CImg<double> image2(input_filename2.c_str());
   CImg<double> gt, gt_sl;
-
+	int MD1,MD2;
   if(gt_filename != "")
   {
     gt = CImg<double>(gt_filename.c_str());
@@ -275,32 +284,36 @@ int main(int argc, char *argv[])
 
     // gt maps are scaled by a factor of 3, undo this...
     for(int i=0; i<gt.height(); i++)
-      for(int j=0; j<gt.width(); j++)
+      for(int j=0; j<gt.width(); j++){
         gt(j,i) = gt(j,i) / 3.0;
-        
+        gt_sl(j,i) = gt_sl(j,i) / 3.0;
+      }
+    MD1=gt.max();
+    cout<<"\nGT_Max_disp: "<<gt.max()<<endl;
     gt_sl.resize(gt.width()/SCALE,gt.height()/SCALE,1,1);//subsampling
-    gt_sl.save((input_filename1 + "-disp_sl.png").c_str());
+    MD2=gt_sl.max();
+    cout<<"\nGT_sl_Max_disp: "<<gt_sl.max()<<endl;
+    gt_sl.save((input_filename1 + "-disp_gt_downscaled.png").c_str());
   }
   CImg<double> input1 = image1.get_resize(image1.width()/SCALE, image1.height()/SCALE, 1,1);
     CImg<double> input2 = image2.get_resize(image2.width()/SCALE, image2.height()/SCALE, 1,1);
   // do naive stereo (matching only, no MRF)
-  CImg<double> naive_disp = naive_stereo(input1, input2, 5, 50);
+  CImg<double> naive_disp = naive_stereo(input1, input2, 5, MD2);
   naive_disp.get_normalize(0,255).save((input_filename1 + "-disp_naive.png").c_str());
 
-  // do scan line stereo using bp recursively
-  CImg<double> sl_disp = sl_stereo(input1, input2, 5,10,20);
+  // do scan line stereo using bp
+  CImg<double> sl_disp = sl_stereo(input1, input2, 5, MD2, input1.width()+input1.height());//input1.width()+input1.height()
   sl_disp.get_normalize(0,255).save((input_filename1 + "-disp_sl.png").c_str());
-/*
+
   // do stereo using mrf
   CImg<double> mrf_disp = mrf_stereo(image1, image2);
   mrf_disp.get_normalize(0,255).save((input_filename1 + "-disp_mrf.png").c_str());
-*/
   // Measure error with respect to ground truth, if we have it...
   if(gt_filename != "")
     {
-      cout << "Naive stereo technique mean error = " << (naive_disp-gt_sl).sqr().sum()/gt.height()/gt.width() << endl;
+      cout << "\nNaive stereo technique mean error = " << (naive_disp-gt_sl).sqr().sum()/gt.height()/gt.width() << endl;
       cout << "\nScan Line stereo technique mean error = " << (sl_disp-gt_sl).sqr().sum()/gt_sl.height()/gt_sl.width() << endl;
-      //cout << "MRF stereo technique mean error = " << (mrf_disp-gt).sqr().sum()/gt.height()/gt.width() << endl;
+      //cout << "\nMRF stereo technique mean error = " << (mrf_disp-gt).sqr().sum()/gt.height()/gt.width() << endl;
     }
 
   return 0;
