@@ -20,7 +20,7 @@ using namespace std;
 double sqr(double a) { return a*a; }
 int count=0;
 //downsampling scale
-#define SCALE 1
+#define SCALE 2
 
 //class to store messages from a certain iteration
 class Message_Matirx {
@@ -101,17 +101,25 @@ void normalize_message(Message_Matirx &Msg)
 		{
 			double temp_right=0;
 			double temp_left=0;
+			double temp_d=0;
+			double temp_u=0;
 			for(int d=0;d<Msg.M_from_right.size();d++)
 			{
 				temp_right+=exp(Msg.M_from_right[d](i,j));
 				temp_left+=exp(Msg.M_from_left[d](i,j));
+				temp_d+=exp(Msg.M_from_d[d](i,j));
+				temp_u+=exp(Msg.M_from_u[d](i,j));
 			}
 			temp_right=log(temp_right);
 			temp_left=log(temp_left);
+			temp_d=log(temp_d);
+			temp_u=log(temp_u);
 			for(int d=0;d<Msg.M_from_right.size();d++)
 			{
 				Msg.M_from_right[d](i,j)-=temp_right;
 				Msg.M_from_left[d](i,j)-=temp_left;
+				Msg.M_from_d[d](i,j)-=temp_d;
+				Msg.M_from_u[d](i,j)-=temp_u;
 			}
 		}
 	}
@@ -167,11 +175,13 @@ double Compute_Message (char dir, const CImg<double> &input1, const CImg<double>
         return best_disp.second;
     }
     else if (dir == 'r') {
-		char from_dir = 'l';
+		char from_dir1 = 'l';
+		char from_dir2 = 'u';
+		char from_dir3 = 'd';
     //    cout<<"sending direction right  ";
         for(vector<int>::iterator it = d2.begin(); it != d2.end(); ++it) {
             double cost = 0;
-            cost = ( D_function(input1, input2, i,j,*it, ws) + V_function(d1,*it,alpha) + Messages[t-1].get_message(from_dir, *it, i, j) );
+            cost = ( D_function(input1, input2, i,j,*it, ws) + V_function(d1,*it,alpha) + Messages[t-1].get_message(from_dir1, *it, i, j) + Messages[t-1].get_message(from_dir2, *it, i, j) + Messages[t-1].get_message(from_dir3, *it, i, j) );
             d = *it;
             if(cost < best_disp.second)
             best_disp = make_pair(d, cost);
@@ -180,10 +190,12 @@ double Compute_Message (char dir, const CImg<double> &input1, const CImg<double>
     }
     else if (dir == 'l') {
    //     cout<<"sending direction left  ";
-        char from_dir = 'r';
+        char from_dir1 = 'r';
+        char from_dir2 = 'u';
+        char from_dir3 = 'd';
         for(vector<int>::iterator it = d2.begin(); it != d2.end(); ++it) {
             double cost = 0;
-            cost = ( D_function(input1, input2, i,j,*it, ws) + V_function(d1,*it,alpha) + Messages[t-1].get_message(from_dir, *it, i, j) );
+            cost = ( D_function(input1, input2, i,j,*it, ws) + V_function(d1,*it,alpha) + Messages[t-1].get_message(from_dir1, *it, i, j) + Messages[t-1].get_message(from_dir2, *it, i, j) + Messages[t-1].get_message(from_dir3, *it, i, j) );
             d = *it;
             if(cost < best_disp.second)
             best_disp = make_pair(d, cost);
@@ -191,11 +203,13 @@ double Compute_Message (char dir, const CImg<double> &input1, const CImg<double>
         return best_disp.second;
     }
     else if (dir == 'd') {
-		char from_dir = 'u';
+		char from_dir1 = 'u';
+		char from_dir2 = 'l';
+		char from_dir3 = 'r';
     //    cout<<"sending direction down  ";
         for(vector<int>::iterator it = d2.begin(); it != d2.end(); ++it) {
             double cost = 0;
-            cost = ( D_function(input1, input2, i,j,*it, ws) + V_function(d1,*it,alpha) + Messages[t-1].get_message(from_dir, *it, i, j) );
+            cost = ( D_function(input1, input2, i,j,*it, ws) + V_function(d1,*it,alpha) + Messages[t-1].get_message(from_dir1, *it, i, j) + Messages[t-1].get_message(from_dir2, *it, i, j) + Messages[t-1].get_message(from_dir3, *it, i, j) );
             d = *it;
             if(cost < best_disp.second)
             best_disp = make_pair(d, cost);
@@ -203,11 +217,13 @@ double Compute_Message (char dir, const CImg<double> &input1, const CImg<double>
         return best_disp.second;
     }
     else if (dir == 'u') {
-   //     cout<<"sending direction left  ";
-        char from_dir = 'd';
+   //     cout<<"sending direction towards up  ";
+        char from_dir1 = 'd';
+        char from_dir2 = 'l';
+        char from_dir3 = 'r';
         for(vector<int>::iterator it = d2.begin(); it != d2.end(); ++it) {
             double cost = 0;
-            cost = ( D_function(input1, input2, i,j,*it, ws) + V_function(d1,*it,alpha) + Messages[t-1].get_message(from_dir, *it, i, j) );
+            cost = ( D_function(input1, input2, i,j,*it, ws) + V_function(d1,*it,alpha) + Messages[t-1].get_message(from_dir1, *it, i, j) + Messages[t-1].get_message(from_dir2, *it, i, j) + Messages[t-1].get_message(from_dir3, *it, i, j) );
             d = *it;
             if(cost < best_disp.second)
             best_disp = make_pair(d, cost);
@@ -216,36 +232,6 @@ double Compute_Message (char dir, const CImg<double> &input1, const CImg<double>
     }
 }
 
-//Scanline Stereo BP
-
-/*//A function to transfer Belief messages and store them
-void generate_belief (const CImg<double> &input1, const CImg<double> &input2, int window_size, int max_disp, int max_iter,double alpha) {
-    //CImg<double> result(input1.width(), input1.height());
-    
-    for (int time=0;time<max_iter;time++)
-    {
-	cout<<"\nIteration number: "<<time<<endl;
-        Message_Matirx temp(max_disp, input1.width(), input1.height());
-        for(int i=0; i<input1.height(); i++)
-	{
-            for(int j=0; j<input1.width(); j++)
-	    {
-                for (int d=0; d < max_disp; d++) 
-		{
-		//	cout<<"i="<<i<<"  j="<<j<<"  d="<<d<<endl;
-			if ((j-1)>0)
-               	       	     temp.set_message('r', d, i, j-1, Compute_Message('l', input1, input2, time, i, j, d, max_disp, window_size,alpha) );
-                        if ((j+1)<input1.width())
-                   	     temp.set_message('l', d, i, j+1, Compute_Message('r', input1, input2, time, i, j, d, max_disp, window_size,alpha) );
-                }
-	    }
-	
-	}
-        Messages.push_back(temp);
-    }
-    cout<<"\nBelief Generated";
-}
-*/
 
 void calculate_energy (const CImg<double> &input1, const CImg<double> &input2, int window_size, int max_disp, int max_iter,double alpha) {
     CImg<double> result(input1.width(), input1.height());
@@ -395,7 +381,7 @@ int main(int argc, char *argv[])
   CImg<double> input1 = image1.get_resize(image1.width()/SCALE, image1.height()/SCALE, 1,1);
     CImg<double> input2 = image2.get_resize(image2.width()/SCALE, image2.height()/SCALE, 1,1);
   // do naive stereo (matching only, no MRF)
-  CImg<double> naive_disp = naive_stereo(input1, input2, 2, 70);
+  CImg<double> naive_disp = naive_stereo(input1, input2, 2, 50);
   naive_disp.get_normalize(0,255).save((input_filename1 + "-disp_naive.png").c_str());
 
   // do scan line stereo using bp on HMM
@@ -404,7 +390,7 @@ int main(int argc, char *argv[])
 
 
   // do stereo using BP on mrf
-  CImg<double> mrf_disp = mrf_stereo(input1, input2, 2, 70, 30, a);
+  CImg<double> mrf_disp = mrf_stereo(input1, input2, 2, 50, 1, a);
   mrf_disp.get_normalize(0,255).save((input_filename1 + "-disp_mrf.png").c_str());
 
   // Measure error with respect to ground truth, if we have it...
