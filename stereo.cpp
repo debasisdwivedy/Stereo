@@ -283,7 +283,7 @@ void calculate_energy (const CImg<double> &input1, const CImg<double> &input2, i
 						if ((i+1)<input1.height()) temp.set_message('u', d, i+1, j, Compute_Message('d', input1, input2, time, i, j, d, max_disp, window_size,alpha) );
 					}
 		 //normalize_message(temp);
-		 //temp.normalize();
+		 temp.normalize();
 		 temp.save_mes_as_image();
 		 Messages.push_back(temp);
 
@@ -434,7 +434,7 @@ int main(int argc, char *argv[])
   //sl_disp.get_normalize(0,255).save((input_filename1 + "-disp_sl.png").c_str());
 
 
-  // do stereo using BP on mrf // Max_disparity is suggested to be taken as MD
+  // do stereo using BP on mrf // Max_disparity is suggested to be taken as MD -> but takes too much time.
   CImg<double> mrf_disp = mrf_stereo(input1, input2, 2, 50, input1.width()+input1.height(), a);//input1.width()+input1.height()
   mrf_disp.get_normalize(0,255).save((input_filename1 + "-disp_mrf.png").c_str());
 
