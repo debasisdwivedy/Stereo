@@ -299,9 +299,9 @@ void calculate_energy (const CImg<double> &input1, const CImg<double> &input2, i
 			}
 		}
 		ofstream out;
-		outputFile.open("Energy_MRF_Stereo.txt");
+		out.open("Energy_MRF_Stereo.txt");
 		out<<"\nEnergy of the iteration "<<time<<" : "<<Energy<<" \n";
-		outputFile.close();
+		out.close();
     }
     cout<<"\nBelief Generated\n";
 }
@@ -429,10 +429,10 @@ int main(int argc, char *argv[])
       cout << "\nMRF stereo technique mean error = " << (mrf_disp-gt_sl).sqr().sum()/gt_sl.height()/gt_sl.width() << endl;
       
 		ofstream out;
-		outputFile.open("Mean_Error_MRF_Stereo.txt");
+		out.open("Mean_Error_MRF_Stereo.txt");
 		out << "\nNaive stereo technique mean error = " << (naive_disp-gt_sl).sqr().sum()/gt_sl.height()/gt_sl.width() << endl;
 		out << "\nMRF stereo technique mean error = " << (mrf_disp-gt_sl).sqr().sum()/gt_sl.height()/gt_sl.width() << endl;
-		outputFile.close();
+		out.close();
     }
   return 0;
 }
