@@ -59,20 +59,20 @@ CImg<double> render(const CImg<double> &img_rgb, CImg<double> &img_disp,int offs
 
 int main(int argc, char *argv[])
 {
-  if(argc != 4)
+  if(argc != 3)
     {
       cerr << "usage: " << argv[0] << " image_file disp_file" << endl;
       return 1;
     }
 
   string input_filename1 = argv[1], input_filename2 = argv[2];
-  int a;
-  istringstream iss( argv[3] );
-  if(iss>>a){}
+//  int a;
+//  istringstream iss( argv[3] );
+//  if(iss>>a){}
   // read in images and gt
   CImg<double> image_rgb(input_filename1.c_str());
   CImg<double> image_disp(input_filename2.c_str());
-  cout<<a<<endl;
+//  cout<<a<<endl;
   CImg<double> image_result=render(image_rgb,image_disp,0,0.05);
  // rendered.save("rendered.png");	
  // ofstream ofs("render.txt"); 

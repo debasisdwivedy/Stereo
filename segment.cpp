@@ -382,7 +382,7 @@ CImg<double> naive_segment(const CImg<double> &img, const vector<Point> &fg, con
 }
 
 
-CImg<double> mrf_segment(const CImg<double> &img, const vector<Point> &fg, const vector<Point> &bg)
+CImg<double> mrf_segment(const CImg<double> &img, const vector<Point> &fg, const vector<Point> &bg,double alpha)
 {
 	CImg<double> output(img.width(),img.height());
 	mean_n_variance_rgb mnv=mean_n_variance(img,fg);
@@ -392,7 +392,7 @@ CImg<double> mrf_segment(const CImg<double> &img, const vector<Point> &fg, const
 	//	double beta=(beta_bg+beta_fg)/2;
 	double beta=get_beta(img,mnv,fg,bg);
 //        double beta=20;
-	double alpha=beta;
+//	double alpha=beta;
 
 	cout<<"beta in mrf="<<beta<<endl;
 
@@ -427,7 +427,7 @@ CImg<double> mrf_segment(const CImg<double> &img, const vector<Point> &fg, const
 
 	normalize_message(next_msg);
 	CImg<double> temp_label=naive_segment(img,fg,bg);
-	for(int t=0;t<300;t++)
+	for(int t=0;t<200;t++)
 	{
 		cout<<"in "<<t<<"th round"<<endl;
 		double Energy=0;
@@ -535,15 +535,15 @@ void output_segmentation(const CImg<double> &img, const CImg<double> &labels, co
 
 int main(int argc, char *argv[])
 {
-	if(argc != 3)
+	if(argc != 4)
 	{
 		cerr << "usage: " << argv[0] << " image_file seeds_file" << endl;
 		return 1;
 	}
 
-	// int a; 
-	// istringstream iss( argv[3] );
-	//  if(iss>>a){}
+	int a; 
+	istringstream iss( argv[3] );
+	if(iss>>a){}
 
 	string input_filename1 = argv[1], input_filename2 = argv[2];
 
@@ -568,10 +568,11 @@ int main(int argc, char *argv[])
 	// do naive segmentation
 	CImg<double> labels = naive_segment(image_rgb, fg_pixels, bg_pixels);
 	output_segmentation(image_rgb, labels, input_filename1 + "-naive_segment_result");
-
+	labels.get_normalize(0,255).save((input_filename1+"-naive_disp.png").c_str());
 	// do mrf segmentation
-	labels = mrf_segment(image_rgb, fg_pixels, bg_pixels);
+	labels = mrf_segment(image_rgb, fg_pixels, bg_pixels,a);
 	output_segmentation(image_rgb, labels, input_filename1 + "-mrf_segment_result");
+	labels.get_normalize(0,255).save((input_filename1+"-mrf_disp.png").c_str());
 
 	return 0;
 }
