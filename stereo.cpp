@@ -271,7 +271,7 @@ void calculate_energy (const CImg<double> &input1, const CImg<double> &input2, i
 					}
 		 //normalize_message(temp);
 		 temp.normalize();
-		 temp.save_mes_as_image();
+		 //temp.save_mes_as_image();
 		 Messages.push_back(temp);
 
 		 CImg<double> result(input1.width(), input1.height());
@@ -298,7 +298,10 @@ void calculate_energy (const CImg<double> &input1, const CImg<double> &input2, i
 				Energy += D_function(input1,input2, i, j, result(j,i), window_size)+ (((j-1)>0)?V_function(result(j,i),result(j-1,i), alpha):0) + (((j+1)<input1.width())?V_function(result(j,i),result(j+1,i), alpha):0) + (((i-1)>0)?V_function(result(j,i),result(j,i-1), alpha):0)+(((i+1)<input1.height())?V_function(result(j,i),result(j,i+1), alpha):0);
 			}
 		}
-		cout<<"\nEnergy of the iteration "<<time<<" : "<<Energy<<" \n";
+		ofstream out;
+		outputFile.open("Energy_MRF_Stereo.txt");
+		out<<"\nEnergy of the iteration "<<time<<" : "<<Energy<<" \n";
+		outputFile.close();
     }
     cout<<"\nBelief Generated\n";
 }
@@ -401,12 +404,12 @@ int main(int argc, char *argv[])
     gt_sl.resize(gt.width()/SCALE,gt.height()/SCALE,1,1);//subsampling
     gt_sl.save((input_filename1 + "-disp_gt_downscaled.png").c_str());
     MD = gt_sl.max();
-    cout<<"\nMD: "<<MD<<endl;
+    cout<<"\nMax_Disparity: "<<MD<<endl;
   }
-  //CImg<double> input1 = image1.get_resize(image1.width()/SCALE, image1.height()/SCALE, 1,1);
-    //CImg<double> input2 = image2.get_resize(image2.width()/SCALE, image2.height()/SCALE, 1,1);
+  CImg<double> input1 = image1.get_resize(image1.width()/SCALE, image1.height()/SCALE, 1,1);
+  CImg<double> input2 = image2.get_resize(image2.width()/SCALE, image2.height()/SCALE, 1,1);
   // do naive stereo (matching only, no MRF)
-  CImg<double> naive_disp = naive_stereo(image1, image2, 2, 50);
+  CImg<double> naive_disp = naive_stereo(input1, input2, 2, MD);
   naive_disp.get_normalize(0,255).save((input_filename1 + "-disp_naive.png").c_str());
 
   // do scan line stereo using bp on HMM
@@ -415,7 +418,7 @@ int main(int argc, char *argv[])
 
 
   // do stereo using BP on mrf
-  CImg<double> mrf_disp = mrf_stereo(image1, image2, 2, 50, 30, a);
+  CImg<double> mrf_disp = mrf_stereo(input1, input2, 2, MD, input1.width()+input1.height(), a);//input1.width()+input1.height()
   mrf_disp.get_normalize(0,255).save((input_filename1 + "-disp_mrf.png").c_str());
 
   // Measure error with respect to ground truth, if we have it...
@@ -424,6 +427,12 @@ int main(int argc, char *argv[])
       cout << "\nNaive stereo technique mean error = " << (naive_disp-gt_sl).sqr().sum()/gt_sl.height()/gt_sl.width() << endl;
       //cout << "\nScan Line stereo technique mean error = " << (sl_disp-gt_sl).sqr().sum()/gt_sl.height()/gt_sl.width() << endl;
       cout << "\nMRF stereo technique mean error = " << (mrf_disp-gt_sl).sqr().sum()/gt_sl.height()/gt_sl.width() << endl;
+      
+		ofstream out;
+		outputFile.open("Mean_Error_MRF_Stereo.txt");
+		out << "\nNaive stereo technique mean error = " << (naive_disp-gt_sl).sqr().sum()/gt_sl.height()/gt_sl.width() << endl;
+		out << "\nMRF stereo technique mean error = " << (mrf_disp-gt_sl).sqr().sum()/gt_sl.height()/gt_sl.width() << endl;
+		outputFile.close();
     }
   return 0;
 }
