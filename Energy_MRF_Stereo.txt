@@ -1,0 +1,2 @@
+
+Energy of the iteration 0 : 7.59768e+06 

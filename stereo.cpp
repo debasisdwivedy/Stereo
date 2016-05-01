@@ -22,6 +22,8 @@ double sqr(double a) { return a*a; }
 int count=0;
 //downsampling scale
 #define SCALE 1
+double alpha;
+string input_Name1;
 
 //class to store messages from a certain iteration
 class Message_Matirx {
@@ -79,10 +81,10 @@ class Message_Matirx {
 		}
 	}
 	void save_mes_as_image() {
-		M_from_left[M_from_left.size()-2].normalize(0,255).save("left_message.png");
-		M_from_right[M_from_right.size()-2].normalize(0,255).save("right_message.png");
-		M_from_u[M_from_u.size()-2].normalize(0,255).save("up_message.png");
-		M_from_d[M_from_d.size()-2].normalize(0,255).save("down_message.png");
+		M_from_left[M_from_left.size()-2].normalize(0,255).save((input_Name1 + "-random_left_message.png").c_str());
+		M_from_right[M_from_right.size()-2].normalize(0,255).save((input_Name1 + "-random_right_message.png").c_str());
+		M_from_u[M_from_u.size()-2].normalize(0,255).save((input_Name1 + "-random_up_message.png").c_str());
+		M_from_d[M_from_d.size()-2].normalize(0,255).save((input_Name1 + "-random_down_message.png").c_str());
 	}
 };
 vector<Message_Matirx> Messages;
@@ -93,6 +95,7 @@ double D_function(const CImg<double> &input1, const CImg<double> &input2, int i,
     for(int ii = max(i-window_size, 0); ii <= min(i+window_size, input1.height()-1); ii++)
         for(int jj = max(j-window_size, 0); jj <= min(j+window_size, input1.width()-1); jj++)
             cost += sqr(input1(min(jj+d, input1.width()-1), ii) - input2(jj, ii));
+    //cout<<"\nD: "<<(cost/100)<<endl;
     return (cost/100);// coz the forces of D and V need to be balanced perfectly
  //     return cost;
 }
@@ -154,6 +157,7 @@ void normalize_message(Message_Matirx &Msg)
 CImg<double> naive_stereo(const CImg<double> &input1, const CImg<double> &input2, int window_size, int max_disp)
 {  
   CImg<double> result(input1.width(), input1.height());
+  CImg<double> Cost(input1.width(), input1.height());
 
   for(int i=0; i<input1.height(); i++)
     for(int j=0; j<input1.width(); j++)
@@ -170,8 +174,17 @@ CImg<double> naive_stereo(const CImg<double> &input1, const CImg<double> &input2
     	   	         best_disp = make_pair(d, cost);
      	 }
    	 result(j,i) = best_disp.first;
+   	 Cost(j,i) = best_disp.second;
 //	 cout<<best_disp.second<<endl;
     }
+    /* for alpha value suggestions
+    alpha = Cost.mean();
+    cout<<"Alpha_mean: "<<alpha<<endl;
+    cout<<"Alpha_min: "<<Cost.min()<<endl;
+    cout<<"Alpha_max: "<<Cost.max()<<endl;
+    cout<<"Alpha_median: "<<Cost.median()<<endl;
+    cout<<"Alpha_variance: "<<Cost.variance()<<endl;
+    */
 
   return result;
 }
@@ -257,7 +270,7 @@ double Compute_Message (char dir, const CImg<double> &input1, const CImg<double>
 void calculate_energy (const CImg<double> &input1, const CImg<double> &input2, int window_size, int max_disp, int max_iter,double alpha) {
     CImg<double> result(input1.width(), input1.height());
 //    double alpha=10;
-    for (int time=0;time<=max_iter;time++){
+	    for (int time=0;time<=max_iter;time++){
 		cout<<"\nIteration number: "<<time;
 			Message_Matirx temp(max_disp, input1.width(), input1.height());
 			for(int i=0; i<input1.height(); i++)
@@ -270,8 +283,8 @@ void calculate_energy (const CImg<double> &input1, const CImg<double> &input2, i
 						if ((i+1)<input1.height()) temp.set_message('u', d, i+1, j, Compute_Message('d', input1, input2, time, i, j, d, max_disp, window_size,alpha) );
 					}
 		 //normalize_message(temp);
-		 temp.normalize();
-		 //temp.save_mes_as_image();
+		 //temp.normalize();
+		 temp.save_mes_as_image();
 		 Messages.push_back(temp);
 
 		 CImg<double> result(input1.width(), input1.height());
@@ -289,6 +302,7 @@ void calculate_energy (const CImg<double> &input1, const CImg<double> &input2, i
 				result(j,i) = best_disp.first;	
 			}
 		}
+		result.get_normalize(0,255).save((input_Name1 + "-disp_mrf_last_iter.png").c_str());
 
 		long double Energy=0;
 		for(int i=0; i<input1.height(); i++)
@@ -299,11 +313,13 @@ void calculate_energy (const CImg<double> &input1, const CImg<double> &input2, i
 			}
 		}
 		ofstream out;
-		out.open("Energy_MRF_Stereo.txt");
+		out.open((input_Name1 + "Energy_MRF_Stereo.txt").c_str(), ios_base::app);
+		cout<<"\nEnergy of the iteration "<<time<<" : "<<Energy<<" \n";
 		out<<"\nEnergy of the iteration "<<time<<" : "<<Energy<<" \n";
 		out.close();
     }
     cout<<"\nBelief Generated\n";
+    
 }
 
 //BP on ScanLine Stereo HMM
@@ -378,6 +394,7 @@ int main(int argc, char *argv[])
 
 
   string input_filename1 = argv[1], input_filename2 = argv[2];
+  input_Name1=argv[1];
   string gt_filename;
 //  if(argc == 4)
     gt_filename = argv[3];
@@ -409,7 +426,7 @@ int main(int argc, char *argv[])
   CImg<double> input1 = image1.get_resize(image1.width()/SCALE, image1.height()/SCALE, 1,1);
   CImg<double> input2 = image2.get_resize(image2.width()/SCALE, image2.height()/SCALE, 1,1);
   // do naive stereo (matching only, no MRF)
-  CImg<double> naive_disp = naive_stereo(input1, input2, 2, MD);
+  CImg<double> naive_disp = naive_stereo(input1, input2, 2, 50);
   naive_disp.get_normalize(0,255).save((input_filename1 + "-disp_naive.png").c_str());
 
   // do scan line stereo using bp on HMM
@@ -417,8 +434,8 @@ int main(int argc, char *argv[])
   //sl_disp.get_normalize(0,255).save((input_filename1 + "-disp_sl.png").c_str());
 
 
-  // do stereo using BP on mrf
-  CImg<double> mrf_disp = mrf_stereo(input1, input2, 2, MD, input1.width()+input1.height(), a);//input1.width()+input1.height()
+  // do stereo using BP on mrf // Max_disparity is suggested to be taken as MD
+  CImg<double> mrf_disp = mrf_stereo(input1, input2, 2, 50, input1.width()+input1.height(), a);//input1.width()+input1.height()
   mrf_disp.get_normalize(0,255).save((input_filename1 + "-disp_mrf.png").c_str());
 
   // Measure error with respect to ground truth, if we have it...
