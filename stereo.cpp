@@ -13,6 +13,7 @@
 #include <CImg.h>
 #include <assert.h>
 #include <sstream>
+#include <float.h>
 
 using namespace cimg_library;
 using namespace std;
@@ -63,6 +64,26 @@ class Message_Matirx {
         else if (from_dir=='d')
             M_from_d[d](j,i) = value;       
     }
+    void normalize() {
+		for(vector<CImg<double>>::iterator it = M_from_left.begin(); it != M_from_left.end(); ++it){
+			(*it).normalize(0,200);
+		}
+		for(vector<CImg<double>>::iterator it = M_from_right.begin(); it != M_from_right.end(); ++it){
+			(*it).normalize(0,200);
+		}
+		for(vector<CImg<double>>::iterator it = M_from_u.begin(); it != M_from_u.end(); ++it){
+			(*it).normalize(0,200);
+		}
+		for(vector<CImg<double>>::iterator it = M_from_d.begin(); it != M_from_d.end(); ++it){
+			(*it).normalize(0,200);
+		}
+	}
+	void save_mes_as_image() {
+		M_from_left[M_from_left.size()-2].normalize(0,255).save("left_message.png");
+		M_from_right[M_from_right.size()-2].normalize(0,255).save("right_message.png");
+		M_from_u[M_from_u.size()-2].normalize(0,255).save("up_message.png");
+		M_from_d[M_from_d.size()-2].normalize(0,255).save("down_message.png");
+	}
 };
 vector<Message_Matirx> Messages;
 //vector<Message_Matirx> to store the messages as per the iterations
@@ -167,7 +188,7 @@ double Compute_Message (char dir, const CImg<double> &input1, const CImg<double>
     pair<int, double> best_disp(0, INFINITY);
     if ( (t==0) || ((dir=='r')&&((j-1)<0)) || ((dir=='l')&&((j+1)>input1.width())) || ((dir=='d')&&((i-1)<0)) || ((dir=='u')&&((j+1)>input1.height())) ) {
         for(vector<int>::iterator it = d2.begin(); it != d2.end(); ++it) {
-            cost= ( D_function(input1, input2, i,j,*it, ws) + V_function(d1,*it,alpha) );//v function constant =30
+            cost= ( D_function(input1, input2, i,j,*it, ws) + V_function(d1,*it,alpha) );
             d = *it;
             if(cost < best_disp.second)
 				best_disp = make_pair(d, cost);
@@ -248,7 +269,9 @@ void calculate_energy (const CImg<double> &input1, const CImg<double> &input2, i
 						if ((i-1)>0) temp.set_message('d', d, i-1, j, Compute_Message('u', input1, input2, time, i, j, d, max_disp, window_size,alpha) );
 						if ((i+1)<input1.height()) temp.set_message('u', d, i+1, j, Compute_Message('d', input1, input2, time, i, j, d, max_disp, window_size,alpha) );
 					}
-		 normalize_message(temp);
+		 //normalize_message(temp);
+		 temp.normalize();
+		 temp.save_mes_as_image();
 		 Messages.push_back(temp);
 
 		 CImg<double> result(input1.width(), input1.height());
@@ -281,6 +304,7 @@ void calculate_energy (const CImg<double> &input1, const CImg<double> &input2, i
 }
 
 //BP on ScanLine Stereo HMM
+/*
 CImg<double> sl_stereo(const CImg<double> &input1, const CImg<double> &input2, int window_size, int max_disp, int max_iter,double alpha) {
     
     CImg<double> result(input1.width(), input1.height());
@@ -305,7 +329,7 @@ CImg<double> sl_stereo(const CImg<double> &input1, const CImg<double> &input2, i
      }
      return result;
 }
-
+*/
 
 //BP on MRF
 
@@ -321,8 +345,9 @@ CImg<double> mrf_stereo(const CImg<double> &input1, const CImg<double> &input2, 
         {
             pair<int, double> best_disp(0, INFINITY);
             for (int d=0; d < max_disp; d++)
-	    {
-                double cost =( D_function(input1,input2, i, j, d, window_size) + Messages[max_iter].get_message('l', d, i, j) + Messages[max_iter].get_message('r', d, i, j) + Messages[max_iter].get_message('u', d, i, j) + Messages[max_iter].get_message('d', d, i, j) );
+			{
+                double cost =( D_function(input1,input2, i, j, d, window_size) + Messages[max_iter-1].get_message('l', d, i, j) + Messages[max_iter-1].get_message('r', d, i, j) + Messages[max_iter-1].get_message('u', d, i, j) + Messages[max_iter-1].get_message('d', d, i, j) );
+			//cout<<"Messages: "<<Messages[max_iter-1].get_message('l', d, i, j)<<" , "<<Messages[max_iter-1].get_message('r', d, i, j)<<" , "<<Messages[max_iter-1].get_message('u', d, i, j)<<" , "<<Messages[max_iter-1].get_message('d', d, i, j)<<endl;
 		if(cost < best_disp.second)
 			best_disp = make_pair(d, cost);
 	    }
