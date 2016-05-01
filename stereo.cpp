@@ -21,7 +21,7 @@ using namespace std;
 double sqr(double a) { return a*a; }
 int count=0;
 //downsampling scale
-#define SCALE 2
+#define SCALE 1
 
 //class to store messages from a certain iteration
 class Message_Matirx {
@@ -47,8 +47,8 @@ class Message_Matirx {
     double get_message(char from_dir, int d, int i, int j) {
         if (from_dir=='l')
             return M_from_left[d](j,i);
-        else if (from_dir=='l')
-            return M_from_left[d](j,i);
+        else if (from_dir=='r')
+            return M_from_right[d](j,i);
         else if (from_dir=='u')
             return M_from_u[d](j,i);
         else if (from_dir=='d')
@@ -57,8 +57,8 @@ class Message_Matirx {
     void set_message(char from_dir, int d, int i, int j, double value) {
         if (from_dir=='l')
             M_from_left[d](j,i) = value;
-        else if (from_dir=='l')
-            M_from_left[d](j,i) = value;
+        else if (from_dir=='r')
+            M_from_right[d](j,i) = value;
         else if (from_dir=='u')
             M_from_u[d](j,i) = value;
         else if (from_dir=='d')
@@ -66,16 +66,16 @@ class Message_Matirx {
     }
     void normalize() {
 		for(vector<CImg<double>>::iterator it = M_from_left.begin(); it != M_from_left.end(); ++it){
-			(*it).normalize(0,200);
+			(*it).normalize(0,2000);
 		}
 		for(vector<CImg<double>>::iterator it = M_from_right.begin(); it != M_from_right.end(); ++it){
-			(*it).normalize(0,200);
+			(*it).normalize(0,2000);
 		}
 		for(vector<CImg<double>>::iterator it = M_from_u.begin(); it != M_from_u.end(); ++it){
-			(*it).normalize(0,200);
+			(*it).normalize(0,2000);
 		}
 		for(vector<CImg<double>>::iterator it = M_from_d.begin(); it != M_from_d.end(); ++it){
-			(*it).normalize(0,200);
+			(*it).normalize(0,2000);
 		}
 	}
 	void save_mes_as_image() {
@@ -186,7 +186,7 @@ double Compute_Message (char dir, const CImg<double> &input1, const CImg<double>
     double cost = 0;
     int d;
     pair<int, double> best_disp(0, INFINITY);
-    if ( (t==0) || ((dir=='r')&&((j-1)<0)) || ((dir=='l')&&((j+1)>input1.width())) || ((dir=='d')&&((i-1)<0)) || ((dir=='u')&&((j+1)>input1.height())) ) {
+    if ( (t==0) || ((dir=='r')&&((j-1)<0)) || ((dir=='r')&&((i-1)<0)) || ((dir=='r')&&((i+1)>input1.height())) || ((dir=='l')&&((j+1)>input1.width())) || ((dir=='l')&&((i+1)>input1.height())) || ((dir=='l')&&((i-1)<0)) || ((dir=='d')&&((i-1)<0)) || ((dir=='d')&&((j-1)<0)) || ((dir=='d')&&((j+1)>input1.width())) || ((dir=='u')&&((i+1)>input1.height())) || ((dir=='u')&&((j+1)>input1.width())) || ((dir=='u')&&((j-1)<0)) ) {
         for(vector<int>::iterator it = d2.begin(); it != d2.end(); ++it) {
             cost= ( D_function(input1, input2, i,j,*it, ws) + V_function(d1,*it,alpha) );
             d = *it;
@@ -304,7 +304,7 @@ void calculate_energy (const CImg<double> &input1, const CImg<double> &input2, i
 }
 
 //BP on ScanLine Stereo HMM
-/*
+
 CImg<double> sl_stereo(const CImg<double> &input1, const CImg<double> &input2, int window_size, int max_disp, int max_iter,double alpha) {
     
     CImg<double> result(input1.width(), input1.height());
@@ -329,7 +329,7 @@ CImg<double> sl_stereo(const CImg<double> &input1, const CImg<double> &input2, i
      }
      return result;
 }
-*/
+
 
 //BP on MRF
 
@@ -403,19 +403,19 @@ int main(int argc, char *argv[])
     MD = gt_sl.max();
     cout<<"\nMD: "<<MD<<endl;
   }
-  CImg<double> input1 = image1.get_resize(image1.width()/SCALE, image1.height()/SCALE, 1,1);
-    CImg<double> input2 = image2.get_resize(image2.width()/SCALE, image2.height()/SCALE, 1,1);
+  //CImg<double> input1 = image1.get_resize(image1.width()/SCALE, image1.height()/SCALE, 1,1);
+    //CImg<double> input2 = image2.get_resize(image2.width()/SCALE, image2.height()/SCALE, 1,1);
   // do naive stereo (matching only, no MRF)
-  CImg<double> naive_disp = naive_stereo(input1, input2, 2, 50);
+  CImg<double> naive_disp = naive_stereo(image1, image2, 2, 50);
   naive_disp.get_normalize(0,255).save((input_filename1 + "-disp_naive.png").c_str());
 
   // do scan line stereo using bp on HMM
-//  CImg<double> sl_disp = sl_stereo(input1, input2, 2, 70, 30, a);//no. of iterations = input1.width()
-//  sl_disp.get_normalize(0,255).save((input_filename1 + "-disp_sl.png").c_str());
+  //CImg<double> sl_disp = sl_stereo(input1, input2, 2, 50, 5, a);//no. of iterations = input1.width()
+  //sl_disp.get_normalize(0,255).save((input_filename1 + "-disp_sl.png").c_str());
 
 
   // do stereo using BP on mrf
-  CImg<double> mrf_disp = mrf_stereo(input1, input2, 2, 50, 1, a);
+  CImg<double> mrf_disp = mrf_stereo(image1, image2, 2, 50, 30, a);
   mrf_disp.get_normalize(0,255).save((input_filename1 + "-disp_mrf.png").c_str());
 
   // Measure error with respect to ground truth, if we have it...
