@@ -537,7 +537,7 @@ int main(int argc, char *argv[])
 {
 	if(argc != 4)
 	{
-		cerr << "usage: " << argv[0] << " image_file seeds_file" << endl;
+		cerr << "usage: " << argv[0] << " image_file seeds_file alpha (magic parameter 200 is a good number if you are wondering where to start..!)" << endl;
 		return 1;
 	}
 
